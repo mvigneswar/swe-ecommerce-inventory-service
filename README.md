@@ -83,25 +83,43 @@ cd swe-ecommerce-inventory-service
 ```bash
 cp .env.example .env      # Windows: copy .env.example .env
 ```
+The API container reads `MYSQL_HOST=mysql` / `REDIS_HOST=redis` automatically
+from `docker-compose.yml` — you only need `.env` for the **local dev** path below.
 
-### 3. Start MySQL + Redis
+---
+
+### Option A — Full stack in Docker (recommended, one command)
 ```bash
-docker compose up -d
+docker compose up -d --build
 ```
-The schema in `db/init.sql` is applied automatically on first boot.
+This boots **MySQL + Redis + the API** together. The schema in `db/init.sql`
+is applied on first boot, and the API waits for the database to be ready before
+accepting traffic. The API is then live on **http://localhost:5000**.
 
-### 4. Install dependencies
 ```bash
+docker compose ps            # confirm all three are "healthy"
+curl http://localhost:5000/api/health
+docker compose logs -f api   # tail API logs
+docker compose down          # stop the stack
+```
+
+### Option B — Local Flask against Docker MySQL + Redis
+```bash
+# 1. start only the data services
+docker compose up -d mysql redis
+
+# 2. create a virtualenv and install deps
 python -m venv venv
 .\venv\Scripts\activate        # macOS/Linux: source venv/bin/activate
 pip install -r requirements.txt
+
+# 3. seed demo data and run
+python scripts/seed_data.py --count 200
+python app.py                 # http://localhost:5000
 ```
 
-### 5. Seed and run
-```bash
-python scripts/seed_data.py --count 200
-python app.py
-```
+**Make targets** wrap the common actions (`make help` lists them):
+`make setup · make compose-up · make seed · make test · make benchmark`.
 
 API is live at **http://localhost:5000** — verify with `GET /api/health`.
 
@@ -283,18 +301,28 @@ python scripts/benchmark.py --runs 50
 
 ## 🐳 Docker
 
+`docker-compose.yml` defines three services on a shared bridge network:
+
+| Service | Image | Host port | Role |
+| :--- | :--- | :---: | :--- |
+| `mysql` | `mysql:8.0` | `3307 → 3306` | InnoDB storage, schema from `db/init.sql` |
+| `redis` | `redis:7-alpine` | `6379` | Cache (AOF + LRU, 256 MB cap) |
+| `api` | built from `Dockerfile` | `5000` | Gunicorn, `FLASK_ENV=production` |
+
 ```bash
-docker compose up -d          # MySQL + Redis
-docker compose logs -f mysql  # watch initialisation
-docker compose down           # stop
-docker compose down -v        # stop and wipe data volumes
+docker compose up -d --build   # build + start the whole stack
+docker compose ps              # all three should report "healthy"
+docker compose logs -f api     # tail API logs
+docker compose down            # stop, keep data
+docker compose down -v         # stop and wipe volumes
 ```
 
-Build the API image itself:
-```bash
-docker build -t ecom-inventory-api .
-```
-The image runs Gunicorn with 4 workers as a non-root user and ships a `HEALTHCHECK`.
+Key production hardening baked into the image:
+- **Non-root user** — the app runs as `appuser`, not root.
+- **`FLASK_ENV=production`** — `DEBUG` is off inside the container.
+- **Gunicorn** — 4 workers, `app:create_app()` calls the factory (the package does not expose a module-level `app`).
+- **`HEALTHCHECK`** — probes `/api/health`; `api` only starts after `mysql` and `redis` are `service_healthy`.
+- **DB-start resilience** — the factory retries the connection and runs `create_all()` on boot, so a slow `init.sql` never 500s the first requests.
 
 ---
 
