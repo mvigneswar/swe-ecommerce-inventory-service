@@ -49,6 +49,22 @@ def _wait_for_db(app, retries: int = 15, delay: int = 2) -> None:
             time.sleep(delay)
 
 
+def _init_swagger(app: "Flask") -> None:
+    """Register Flasgger Swagger UI at /api/docs (spec built from docstrings)."""
+    try:
+        from flasgger import Swagger
+
+        app.config["SWAGGER"] = {
+            "title": "E-Commerce Inventory API",
+            "uiversion": 3,
+            "specs_route": "/api/docs",
+            "openapi": "3.0.3",
+        }
+        Swagger(app)
+    except Exception:  # pragma: no cover - docs are best-effort
+        logger.warning("Flasgger not available; /api/docs disabled.")
+
+
 def create_app(config_name: str | None = None) -> Flask:
     app = Flask(__name__)
 
@@ -73,10 +89,15 @@ def create_app(config_name: str | None = None) -> Flask:
     from app.routes.health_routes import health_bp
     from app.routes.order_routes import order_bp
     from app.routes.product_routes import product_bp
+    from app.routes.ui_routes import ui_bp
 
     app.register_blueprint(health_bp)
     app.register_blueprint(product_bp)
     app.register_blueprint(order_bp)
+    app.register_blueprint(ui_bp)
+
+    # ---- Swagger / OpenAPI docs ----
+    _init_swagger(app)
 
     register_error_handlers(app)
 

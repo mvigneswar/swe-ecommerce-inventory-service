@@ -12,7 +12,9 @@ from app.services.redis_service import (
     product_detail_key,
     product_list_key,
 )
-from app.utils.errors import NotFoundError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+
+from app.utils.errors import ConflictError, NotFoundError
 from app.utils.responses import ok
 
 logger = logging.getLogger(__name__)
@@ -110,8 +112,38 @@ def delete_product(product_id: int):
     if product is None:
         raise NotFoundError(f"Product {product_id} not found.")
 
-    db.session.delete(product)
-    db.session.commit()
+    # Guard sales history: a product referenced by an order line cannot be
+    # hard-deleted (that would orphan/break order records). Surface a clean
+    # 409 instead of crashing on the FK constraint.
+    from app.models.order import OrderItem
+
+    has_orders = (
+        db.session.query(OrderItem.id)
+        .filter(OrderItem.product_id == product_id)
+        .first()
+        is not None
+    )
+    if has_orders:
+        raise ConflictError(
+            "Cannot delete a product that has order history. "
+            "Adjust its stock to zero instead.",
+            details={"product_id": product_id},
+        )
+
+    try:
+        db.session.delete(product)
+        db.session.commit()
+    except IntegrityError as exc:
+        db.session.rollback()
+        logger.warning("Delete failed for product %s: %s", product_id, exc)
+        raise ConflictError(
+            "Cannot delete this product due to a data constraint.",
+            details={"product_id": product_id},
+        ) from exc
+    except SQLAlchemyError as exc:
+        db.session.rollback()
+        logger.exception("Database error deleting product %s", product_id)
+        raise
 
     _invalidate_product_cache()
     logger.info("Deleted product %s", product_id)

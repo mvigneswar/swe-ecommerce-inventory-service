@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>E-Commerce Inventory · Dashboard</title>
+  <style>
+    :root {
+      --bg: #0f172a; --panel: #1e293b; --panel-2: #273449;
+      --text: #e2e8f0; --muted: #94a3b8; --accent: #38bdf8;
+      --green: #34d399; --red: #f87171; --amber: #fbbf24; --border: #334155;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      background: var(--bg); color: var(--text); padding: 24px;
+    }
+    h1 { margin: 0 0 4px; font-size: 22px; }
+    .sub { color: var(--muted); margin-bottom: 20px; font-size: 13px; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    @media (max-width: 980px) { .grid { grid-template-columns: 1fr; } }
+    .card {
+      background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px;
+    }
+    .card h2 { margin: 0 0 12px; font-size: 15px; color: var(--accent); display:flex; justify-content:space-between; align-items:center;}
+    label { display: block; font-size: 12px; color: var(--muted); margin: 8px 0 4px; }
+    input, select, textarea {
+      width: 100%; padding: 8px 10px; background: var(--panel-2); border: 1px solid var(--border);
+      border-radius: 8px; color: var(--text); font-size: 13px;
+    }
+    button {
+      margin-top: 12px; padding: 8px 14px; background: var(--accent); color: #04293a; border: 0;
+      border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 13px;
+    }
+    button.secondary { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--border); }
+    th { color: var(--muted); font-weight: 600; }
+    .pill { padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; }
+    .pill.up { background: rgba(52,211,153,.15); color: var(--green); }
+    .pill.down { background: rgba(248,113,113,.15); color: var(--red); }
+    .pill.ok { background: rgba(56,189,248,.15); color: var(--accent); }
+    .pill.warn { background: rgba(251,191,36,.15); color: var(--amber); }
+    .pill.cancelled { background: rgba(148,163,184,.15); color: var(--muted); }
+    .stat-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+    .stat { background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; flex: 1; min-width: 110px; }
+    .stat .k { font-size: 11px; color: var(--muted); }
+    .stat .v { font-size: 20px; font-weight: 700; }
+    .toast {
+      position: fixed; bottom: 20px; right: 20px; padding: 12px 16px; border-radius: 10px;
+      font-size: 13px; max-width: 360px; display: none; z-index: 50;
+    }
+    .toast.ok { background: #064e3b; color: #d1fae5; border: 1px solid var(--green); }
+    .toast.err { background: #4c1d1d; color: #fee2e2; border: 1px solid var(--red); }
+    .actions button { margin-top:0; }
+    .row-actions { display:flex; gap:6px; }
+    .row-actions button { margin-top:0; padding:4px 8px; font-size:11px; }
+    .muted { color: var(--muted); font-size:12px; }
+    a { color: var(--accent); }
+  </style>
+</head>
+<body>
+  <h1>E-Commerce Inventory API</h1>
+  <div class="sub">Visual console for the Flask + MySQL + Redis service. Base URL: <code id="base"></code></div>
+
+  <div id="health" class="card" style="margin-bottom:16px;">
+    <h2>System Health <span id="health-status" class="pill">…</span></h2>
+    <div class="stat-row">
+      <div class="stat"><div class="k">MySQL</div><div class="v"><span id="mysql" class="pill">…</span></div></div>
+      <div class="stat"><div class="k">Redis</div><div class="v"><span id="redis" class="pill">…</span></div></div>
+      <div class="stat"><div class="k">Cache hits</div><div class="v" id="cache-hits">–</div></div>
+      <div class="stat"><div class="k">Cache misses</div><div class="v" id="cache-miss">–</div></div>
+      <div class="stat"><div class="k">Hit rate</div><div class="v" id="cache-rate">–</div></div>
+    </div>
+    <div class="muted">Cache stats come from <code>/api/health</code>. After a warm reload, hit "Refresh health" to see the rate climb as you browse products.</div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>Products</h2>
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
+        <input id="search" placeholder="Search name…" style="flex:1; min-width:120px;" />
+        <input id="category" placeholder="Category…" style="width:120px;" />
+        <button class="secondary" onclick="loadProducts()">Search</button>
+        <button class="secondary" onclick="refreshHealth()">Refresh health</button>
+      </div>
+      <div style="margin-bottom:10px;">
+        <button class="secondary" onclick="prevPage()">‹ Prev</button>
+        <span class="muted" id="page-info">Page 1</span>
+        <button class="secondary" onclick="nextPage()">Next ›</button>
+      </div>
+      <table id="products">
+        <thead><tr><th>ID</th><th>Name</th><th>Category</th><th>Price</th><th>Stock</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <div class="muted" id="product-meta" style="margin-top:8px;"></div>
+    </div>
+
+    <div class="card">
+      <h2>Create / Update Product</h2>
+      <div class="muted" id="edit-hint">Creating new product. To edit, click “Edit” on a row.</div>
+      <input type="hidden" id="edit-id" />
+      <label>Name</label><input id="p-name" />
+      <label>Category</label><input id="p-category" />
+      <label>Price</label><input id="p-price" type="number" step="0.01" />
+      <label>Stock quantity</label><input id="p-stock" type="number" step="1" />
+      <label>Description</label><textarea id="p-desc" rows="2"></textarea>
+      <div style="display:flex; gap:8px;">
+        <button onclick="saveProduct()">Save product</button>
+        <button class="secondary" onclick="resetProductForm()">Clear</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Place Order</h2>
+      <label>Customer email</label><input id="o-email" placeholder="you@test.com" />
+      <label>Line items (JSON)</label>
+      <textarea id="o-items" rows="4">[{"product_id": 1, "quantity": 2}]</textarea>
+      <div class="muted">Array of {product_id, quantity}. Duplicates are merged server-side.</div>
+      <button onclick="placeOrder()">Place order</button>
+    </div>
+
+    <div class="card">
+      <h2>Orders</h2>
+      <div style="display:flex; gap:8px; margin-bottom:10px;">
+        <input id="o-filter" placeholder="Filter by email…" style="flex:1;" />
+        <button class="secondary" onclick="loadOrders()">Load</button>
+      </div>
+      <table id="orders">
+        <thead><tr><th>ID</th><th>Email</th><th>Total</th><th>Status</th><th>Items</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const BASE = window.location.origin;
+    document.getElementById('base').textContent = BASE;
+    let page = 1;
+
+    function toast(msg, kind) {
+      const t = document.getElementById('toast');
+      t.className = 'toast ' + (kind || 'ok');
+      t.textContent = msg;
+      t.style.display = 'block';
+      clearTimeout(t._timer);
+      t._timer = setTimeout(() => t.style.display = 'none', 3500);
+    }
+
+    async function api(path, opts) {
+      const res = await fetch(BASE + path, Object.assign({ headers: { 'Content-Type': 'application/json' } }, opts));
+      let body = null;
+      try { body = await res.json(); } catch (e) {}
+      return { res, body };
+    }
+
+    function fmtPrice(p) { return p == null ? '–' : '$' + Number(p).toFixed(2); }
+    function statusPill(s) {
+      const cls = s === 'Cancelled' ? 'cancelled' : (s === 'Completed' ? 'ok' : 'warn');
+      return `<span class="pill ${cls}">${s}</span>`;
+    }
+
+    async function refreshHealth() {
+      const { res, body } = await api('/api/health');
+      if (!body || !body.success) { document.getElementById('health-status').textContent = 'error'; return; }
+      const d = body.data;
+      document.getElementById('mysql').textContent = d.dependencies.mysql;
+      document.getElementById('mysql').className = 'pill ' + (d.dependencies.mysql === 'up' ? 'up' : 'down');
+      document.getElementById('redis').textContent = d.dependencies.redis;
+      document.getElementById('redis').className = 'pill ' + (d.dependencies.redis === 'up' ? 'up' : 'down');
+      document.getElementById('health-status').textContent = d.status;
+      document.getElementById('health-status').className = 'pill ' + (d.status === 'healthy' ? 'up' : 'down');
+      const c = d.cache || {};
+      const hits = c.hits || 0, misses = c.misses || 0;
+      document.getElementById('cache-hits').textContent = hits;
+      document.getElementById('cache-miss').textContent = misses;
+      document.getElementById('cache-rate').textContent = c.hit_rate != null ? (c.hit_rate + '%') : '–';
+    }
+
+    async function loadProducts() {
+      const search = document.getElementById('search').value.trim();
+      const category = document.getElementById('category').value.trim();
+      let url = `/api/products?page=${page}&page_size=10`;
+      if (search) url += `&search=${encodeURIComponent(search)}`;
+      if (category) url += `&category=${encodeURIComponent(category)}`;
+      const { res, body } = await api(url);
+      if (!body || !body.success) { toast('Failed to load products', 'err'); return; }
+      const rows = body.data || [];
+      const tb = document.querySelector('#products tbody');
+      tb.innerHTML = '';
+      rows.forEach(p => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${p.id}</td><td>${p.name}</td><td>${p.category}</td>
+          <td>${fmtPrice(p.price)}</td><td>${p.stock_quantity}</td>
+          <td><div class="row-actions">
+            <button class="secondary" onclick="editProduct(${p.id})">Edit</button>
+            <button class="secondary" onclick="delProduct(${p.id})">Delete</button>
+          </div></td>`;
+        tb.appendChild(tr);
+      });
+      const meta = body.meta || {};
+      if (meta.pagination) {
+        document.getElementById('page-info').textContent = `Page ${meta.pagination.page} / ${meta.pagination.pages}`;
+        document.getElementById('product-meta').textContent =
+          `${meta.pagination.total} total · served ${meta.cached ? 'from cache' : 'from DB'} in ${meta.response_time_ms} ms`;
+      }
+    }
+
+    function nextPage() { page++; loadProducts(); }
+    function prevPage() { if (page > 1) { page--; loadProducts(); } }
+
+    function resetProductForm() {
+      document.getElementById('edit-id').value = '';
+      ['p-name','p-category','p-price','p-stock','p-desc'].forEach(id => document.getElementById(id).value = '');
+      document.getElementById('edit-hint').textContent = 'Creating new product.';
+    }
+
+    function editProduct(id) {
+      // fetch full record then fill form
+      api('/api/products/' + id).then(({ body }) => {
+        if (!body || !body.success) { toast('Could not load product', 'err'); return; }
+        const p = body.data;
+        document.getElementById('edit-id').value = p.id;
+        document.getElementById('p-name').value = p.name;
+        document.getElementById('p-category').value = p.category;
+        document.getElementById('p-price').value = p.price;
+        document.getElementById('p-stock').value = p.stock_quantity;
+        document.getElementById('p-desc').value = p.description || '';
+        document.getElementById('edit-hint').textContent = `Editing product #${p.id}`;
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      });
+    }
+
+    async function saveProduct() {
+      const id = document.getElementById('edit-id').value;
+      const payload = {
+        name: document.getElementById('p-name').value.trim(),
+        category: document.getElementById('p-category').value.trim(),
+        price: Number(document.getElementById('p-price').value),
+        stock_quantity: Number(document.getElementById('p-stock').value),
+        description: document.getElementById('p-desc').value.trim() || null,
+      };
+      const opts = { method: id ? 'PUT' : 'POST', body: JSON.stringify(payload) };
+      const { res, body } = await api('/api/products' + (id ? '/' + id : ''), opts);
+      if (res.ok && body && body.success) {
+        toast(id ? 'Product updated' : 'Product created', 'ok');
+        resetProductForm();
+        loadProducts(); refreshHealth();
+      } else {
+        toast((body && body.error && body.error.message) || 'Save failed', 'err');
+      }
+    }
+
+    async function delProduct(id) {
+      if (!confirm('Delete product #' + id + '?')) return;
+      const { res, body } = await api('/api/products/' + id, { method: 'DELETE' });
+      if (res.ok) { toast('Product deleted', 'ok'); loadProducts(); refreshHealth(); }
+      else { toast((body && body.error && body.error.message) || 'Delete failed', 'err'); }
+    }
+
+    async function placeOrder() {
+      let items;
+      try { items = JSON.parse(document.getElementById('o-items').value); }
+      catch (e) { toast('Items must be valid JSON', 'err'); return; }
+      const payload = { customer_email: document.getElementById('o-email').value.trim(), items };
+      const { res, body } = await api('/api/orders', { method: 'POST', body: JSON.stringify(payload) });
+      if (res.ok && body && body.success) {
+        const o = body.data;
+        toast(`Order #${o.id} placed · total ${fmtPrice(o.total_amount)}`, 'ok');
+        loadOrders(); refreshHealth(); loadProducts();
+      } else {
+        toast((body && body.error && body.error.message) || 'Order failed', 'err');
+      }
+    }
+
+    async function loadOrders() {
+      const email = document.getElementById('o-filter').value.trim();
+      let url = '/api/orders?page=1&page_size=20';
+      if (email) url += `&email=${encodeURIComponent(email)}`;
+      const { res, body } = await api(url);
+      if (!body || !body.success) { toast('Failed to load orders', 'err'); return; }
+      const rows = body.data || [];
+      const tb = document.querySelector('#orders tbody');
+      tb.innerHTML = '';
+      rows.forEach(o => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${o.id}</td><td>${o.customer_email}</td><td>${fmtPrice(o.total_amount)}</td>
+          <td>${statusPill(o.status)}</td><td>${o.item_count || 0}</td>
+          <td><div class="row-actions">
+            <button class="secondary" onclick="cancelOrder(${o.id})">Cancel</button>
+          </div></td>`;
+        tb.appendChild(tr);
+      });
+    }
+
+    async function cancelOrder(id) {
+      const { res, body } = await api('/api/orders/' + id + '/cancel', { method: 'POST' });
+      if (res.ok && body && body.success) { toast('Order #' + id + ' cancelled, stock restored', 'ok'); loadOrders(); refreshHealth(); loadProducts(); }
+      else { toast((body && body.error && body.error.message) || 'Cancel failed', 'err'); }
+    }
+
+    // initial load
+    refreshHealth();
+    loadProducts();
+    loadOrders();
+  </script>
+</body>
+</html>

@@ -12,6 +12,15 @@ health_bp = Blueprint("health", __name__, url_prefix="/api")
 
 @health_bp.get("/health")
 def health():
+    """
+    Liveness / readiness probe reporting dependency status + cache stats.
+    ---
+    responses:
+      200:
+        description: Healthy (MySQL up). Cache stats included.
+      503:
+        description: Degraded (MySQL down). Redis is optional.
+    """
     # --- MySQL ---
     try:
         db.session.execute(text("SELECT 1"))

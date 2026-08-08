@@ -138,3 +138,25 @@ class TestUpdateDeleteProduct:
     def test_deletes_product(self, client, sample_product):
         assert client.delete(f"/api/products/{sample_product}").status_code == 200
         assert client.get(f"/api/products/{sample_product}").status_code == 404
+
+    def test_cannot_delete_product_with_order_history(self, client, sample_product, app):
+        """A product referenced by an order line must not be hard-deleted."""
+        from app.extensions import db as _db
+        from app.models.order import Order, OrderItem
+
+        with app.app_context():
+            order = Order(
+                customer_email="history@test.com",
+                total_amount=100.00,
+                status="Completed",
+            )
+            order.items = [
+                OrderItem(product_id=sample_product, quantity=1, price=100.00)
+            ]
+            _db.session.add(order)
+            _db.session.commit()
+
+        response = client.delete(f"/api/products/{sample_product}")
+        assert response.status_code == 409
+        # The product must still exist afterwards.
+        assert client.get(f"/api/products/{sample_product}").status_code == 200
