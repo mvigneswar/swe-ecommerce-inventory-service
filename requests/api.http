@@ -1,0 +1,125 @@
+### E-Commerce Inventory API — request collection
+### Requires the VS Code "REST Client" extension (humao.rest-client).
+### Click "Send Request" above any block.
+
+@baseUrl = http://localhost:5000
+
+### ---------- Health ----------
+GET {{baseUrl}}/api/health
+
+### Service info
+GET {{baseUrl}}/
+
+### ---------- Products ----------
+
+### List products (first call = MySQL, second = Redis; compare meta.cached)
+GET {{baseUrl}}/api/products?page=1&limit=10
+
+### List again — should report "cached": true
+GET {{baseUrl}}/api/products?page=1&limit=10
+
+### Filter by category
+GET {{baseUrl}}/api/products?category=Electronics&limit=5
+
+### Search by name
+GET {{baseUrl}}/api/products?search=Keyboard
+
+### Distinct categories
+GET {{baseUrl}}/api/products/categories
+
+### Single product
+GET {{baseUrl}}/api/products/1
+
+### Create a product
+POST {{baseUrl}}/api/products
+Content-Type: application/json
+
+{
+  "name": "Ergonomic Office Chair",
+  "description": "Lumbar support, mesh back",
+  "category": "Home",
+  "price": 12499.00,
+  "stock_quantity": 15
+}
+
+### Update a product (partial)
+PUT {{baseUrl}}/api/products/1
+Content-Type: application/json
+
+{
+  "price": 9999.00,
+  "stock_quantity": 40
+}
+
+### Delete a product
+DELETE {{baseUrl}}/api/products/1
+
+### ---------- Validation failures ----------
+
+### Missing name -> 400 VALIDATION_ERROR
+POST {{baseUrl}}/api/products
+Content-Type: application/json
+
+{
+  "category": "Home",
+  "price": 100
+}
+
+### Negative price -> 400
+POST {{baseUrl}}/api/products
+Content-Type: application/json
+
+{
+  "name": "Broken",
+  "category": "Home",
+  "price": -50
+}
+
+### Unknown product -> 404 NOT_FOUND
+GET {{baseUrl}}/api/products/999999
+
+### ---------- Orders ----------
+
+### Place an order (decrements stock atomically)
+POST {{baseUrl}}/api/orders
+Content-Type: application/json
+
+{
+  "customer_email": "buyer@example.com",
+  "items": [
+    { "product_id": 2, "quantity": 2 },
+    { "product_id": 3, "quantity": 1 }
+  ]
+}
+
+### Oversell attempt -> 409 INSUFFICIENT_STOCK with available count
+POST {{baseUrl}}/api/orders
+Content-Type: application/json
+
+{
+  "customer_email": "buyer@example.com",
+  "items": [
+    { "product_id": 2, "quantity": 999999 }
+  ]
+}
+
+### Invalid email -> 400
+POST {{baseUrl}}/api/orders
+Content-Type: application/json
+
+{
+  "customer_email": "not-an-email",
+  "items": [{ "product_id": 2, "quantity": 1 }]
+}
+
+### List orders
+GET {{baseUrl}}/api/orders?page=1&limit=10
+
+### Filter orders by customer
+GET {{baseUrl}}/api/orders?email=buyer@example.com
+
+### Order detail with line items
+GET {{baseUrl}}/api/orders/1
+
+### Cancel an order (restores stock)
+POST {{baseUrl}}/api/orders/1/cancel
