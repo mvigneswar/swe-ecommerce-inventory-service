@@ -43,7 +43,7 @@ def list_products(category=None, search=None, page=1, limit=20):
 
     total = query.count()
     rows = (
-        query.order_by(Product.id.desc())
+        query.order_by(Product.id.asc())
         .offset((page - 1) * limit)
         .limit(limit)
         .all()
