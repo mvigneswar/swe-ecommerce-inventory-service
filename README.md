@@ -322,6 +322,10 @@ Key production hardening baked into the image:
 - **DB-start resilience** — the factory retries the connection and runs `create_all()` on boot, so a slow `init.sql` never 500s the first requests.
 
 ---
+<img width="959" height="436" alt="image" src="https://github.com/user-attachments/assets/cf79728d-881b-4e80-8c02-2bfeb0b9de18" />
+
+<img width="959" height="446" alt="image" src="https://github.com/user-attachments/assets/b6f35f20-c714-4d6b-9df7-a5edfc88a1a7" />
+
 
 ## 🛠️ Tech Stack
 
