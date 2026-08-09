@@ -7,9 +7,6 @@ High-throughput Python **Flask** backend for product catalog management and orde
 ![MySQL](https://img.shields.io/badge/MySQL-8.0-4479A1?logo=mysql&logoColor=white)
 ![Redis](https://img.shields.io/badge/Redis-7-DC382D?logo=redis&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)
-![Tests](https://img.shields.io/badge/tests-48%20passing-brightgreen)
-![License](https://img.shields.io/badge/License-MIT-blue.svg)
-
 ---
 
 ## ⚡ Architecture Highlights
@@ -334,7 +331,3 @@ Key production hardening baked into the image:
 **Ops** Docker · Docker Compose
 
 ---
-
-## 📄 License
-
-MIT
