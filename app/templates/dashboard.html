@@ -57,18 +57,6 @@
     .row-actions button { margin-top:0; padding:4px 8px; font-size:11px; }
     .muted { color: var(--muted); font-size:12px; }
     a { color: var(--accent); }
-    /* Constant-height, horizontally scrollable page bar. */
-    .pager-row { display:flex; align-items:center; gap:6px; flex-wrap:nowrap; }
-    .pager {
-      flex:1; min-width:0; overflow-x:auto; overflow-y:hidden;
-      white-space:nowrap; display:flex; gap:4px; align-items:center;
-      scrollbar-width: thin; -webkit-overflow-scrolling: touch;
-      padding: 2px 0;
-    }
-    .pager::-webkit-scrollbar { height: 6px; }
-    .pager::-webkit-scrollbar-thumb { background: var(--border); border-radius: 999px; }
-    .pager button { margin-top:0; padding:4px 10px; font-size:12px; flex:0 0 auto; }
-    .pager .ellipsis { color: var(--muted); padding:0 4px; flex:0 0 auto; user-select:none; }
   </style>
 </head>
 <body>
@@ -96,12 +84,11 @@
         <button class="secondary" onclick="loadProducts()">Search</button>
         <button class="secondary" onclick="refreshHealth()">Refresh health</button>
       </div>
-      <div class="pager-row">
+      <div style="margin-bottom:10px; display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
         <button class="secondary" onclick="gotoPage(1)">« First</button>
         <button class="secondary" onclick="prevPage()">‹ Prev</button>
-        <div id="page-numbers" class="pager"></div>
+        <span id="page-numbers" class="muted" style="display:flex; gap:4px;"></span>
         <button class="secondary" onclick="nextPage()">Next ›</button>
-        <button class="secondary" onclick="gotoLast()">Last »</button>
         <span class="muted" id="page-info">Page 1 / 1</span>
       </div>
       <table id="products">
@@ -237,62 +224,28 @@
     }
 
     function renderPager(cur, pages) {
-      // Always render the full bar with a constant width. Buttons scroll
-      // horizontally; ellipses collapse far-away ranges. The current page is
-      // auto-scrolled into view inside the fixed-height strip.
+      // Show at most 5 page buttons centred on the current page.
+      const span = 2;
+      let start = Math.max(1, cur - span);
+      let end = Math.min(pages, cur + span);
+      if (end - start < 4) start = Math.max(1, end - 4);
       const nums = document.getElementById('page-numbers');
       nums.innerHTML = '';
-
-      const addBtn = (i) => {
+      for (let i = start; i <= end; i++) {
         const b = document.createElement('button');
         b.className = 'secondary';
         b.textContent = i;
-        if (i === cur) {
-          b.style.fontWeight = '700';
-          b.style.background = 'var(--accent)';
-          b.style.color = '#04293a';
-        }
+        b.style.fontWeight = i === cur ? '700' : '400';
+        b.style.background = i === cur ? 'var(--accent)' : '';
+        b.style.color = i === cur ? '#04293a' : '';
         b.onclick = () => gotoPage(i);
         nums.appendChild(b);
-      };
-      const addGap = () => {
-        const s = document.createElement('span');
-        s.className = 'ellipsis';
-        s.textContent = '…';
-        nums.appendChild(s);
-      };
-
-      const WING = 2;           // pages shown on each side of current
-      const EDGE = 1;           // always show first/last
-      const slots = new Set();
-      slots.add(1);
-      slots.add(pages);
-      for (let i = cur - WING; i <= cur + WING; i++) slots.add(i);
-      const visible = [...slots].filter(i => i >= 1 && i <= pages).sort((a, b) => a - b);
-
-      let prev = 0;
-      visible.forEach(i => {
-        if (i - prev > 1) addGap();
-        addBtn(i);
-        prev = i;
-      });
-
-      // Auto-scroll so the current page button is centred in the strip.
-      const active = nums.querySelector('button[style*="04293a"]') || nums.children[0];
-      if (active) {
-        nums.scrollLeft = active.offsetLeft - nums.clientWidth / 2 + active.offsetWidth / 2;
       }
     }
 
     function gotoPage(p) { page = p; loadProducts(); }
     function nextPage() { page++; loadProducts(); }
     function prevPage() { if (page > 1) { page--; loadProducts(); } }
-    function gotoLast() {
-      // Total page count isn't known until after load; re-read from the label.
-      const m = /Page \d+ \/ (\d+)/.exec(document.getElementById('page-info').textContent);
-      const last = m ? Number(m[1]) : page;
-      gotoPage(last);
-    }
 
     function resetProductForm() {
       document.getElementById('edit-id').value = '';
