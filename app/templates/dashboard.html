@@ -84,10 +84,12 @@
         <button class="secondary" onclick="loadProducts()">Search</button>
         <button class="secondary" onclick="refreshHealth()">Refresh health</button>
       </div>
-      <div style="margin-bottom:10px;">
+      <div style="margin-bottom:10px; display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+        <button class="secondary" onclick="gotoPage(1)">« First</button>
         <button class="secondary" onclick="prevPage()">‹ Prev</button>
-        <span class="muted" id="page-info">Page 1</span>
+        <span id="page-numbers" class="muted" style="display:flex; gap:4px;"></span>
         <button class="secondary" onclick="nextPage()">Next ›</button>
+        <span class="muted" id="page-info">Page 1 / 1</span>
       </div>
       <table id="products">
         <thead><tr><th>ID</th><th>Name</th><th>Category</th><th>Price</th><th>Stock</th><th></th></tr></thead>
@@ -156,7 +158,18 @@
       return { res, body };
     }
 
-    function fmtPrice(p) { return p == null ? '–' : '$' + Number(p).toFixed(2); }
+    function fmtPrice(p) {
+      if (p == null) return '–';
+      // Indian Rupee with Indian digit grouping (lakh/crore).
+      const n = Number(p).toFixed(2);
+      const [intPart, dec] = n.split('.');
+      const last3 = intPart.slice(-3);
+      const rest = intPart.slice(0, -3);
+      const grouped = rest
+        ? rest.replace(/\B(?=(\d{2})+(?!\d))/g, ',') + ',' + last3
+        : last3;
+      return '₹' + grouped + '.' + dec;
+    }
     function statusPill(s) {
       const cls = s === 'Cancelled' ? 'cancelled' : (s === 'Completed' ? 'ok' : 'warn');
       return `<span class="pill ${cls}">${s}</span>`;
@@ -206,9 +219,31 @@
         document.getElementById('page-info').textContent = `Page ${meta.pagination.page} / ${meta.pagination.pages}`;
         document.getElementById('product-meta').textContent =
           `${meta.pagination.total} total · served ${meta.cached ? 'from cache' : 'from DB'} in ${meta.response_time_ms} ms`;
+        renderPager(meta.pagination.page, meta.pagination.pages);
       }
     }
 
+    function renderPager(cur, pages) {
+      // Show at most 5 page buttons centred on the current page.
+      const span = 2;
+      let start = Math.max(1, cur - span);
+      let end = Math.min(pages, cur + span);
+      if (end - start < 4) start = Math.max(1, end - 4);
+      const nums = document.getElementById('page-numbers');
+      nums.innerHTML = '';
+      for (let i = start; i <= end; i++) {
+        const b = document.createElement('button');
+        b.className = 'secondary';
+        b.textContent = i;
+        b.style.fontWeight = i === cur ? '700' : '400';
+        b.style.background = i === cur ? 'var(--accent)' : '';
+        b.style.color = i === cur ? '#04293a' : '';
+        b.onclick = () => gotoPage(i);
+        nums.appendChild(b);
+      }
+    }
+
+    function gotoPage(p) { page = p; loadProducts(); }
     function nextPage() { page++; loadProducts(); }
     function prevPage() { if (page > 1) { page--; loadProducts(); } }
 
