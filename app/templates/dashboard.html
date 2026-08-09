@@ -195,7 +195,7 @@
     async function loadProducts() {
       const search = document.getElementById('search').value.trim();
       const category = document.getElementById('category').value.trim();
-      let url = `/api/products?page=${page}&page_size=10`;
+      let url = `/api/products?page=${page}&limit=10`;
       if (search) url += `&search=${encodeURIComponent(search)}`;
       if (category) url += `&category=${encodeURIComponent(category)}`;
       const { res, body } = await api(url);
@@ -313,7 +313,7 @@
 
     async function loadOrders() {
       const email = document.getElementById('o-filter').value.trim();
-      let url = '/api/orders?page=1&page_size=20';
+      let url = '/api/orders?page=1&limit=20';
       if (email) url += `&email=${encodeURIComponent(email)}`;
       const { res, body } = await api(url);
       if (!body || !body.success) { toast('Failed to load orders', 'err'); return; }
